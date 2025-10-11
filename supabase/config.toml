@@ -1,0 +1,4 @@
+project_id = "pfbymyuvjjowvcjmmhif"
+
+[functions.discover-papers]
+verify_jwt = false
