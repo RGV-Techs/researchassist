@@ -1,0 +1,167 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titling}
+\usepackage{setspace}
+
+\onehalfspacing
+
+\title{\textbf{Autonomous Research Assistant} \\ \large A Brief Project Report}
+\author{
+  \textbf{Gnaneshwar Reddy Dontireddy} \\
+  Email: \href{mailto:221fa04603@gmail.com}{221fa04603@gmail.com} \\[6pt]
+  \textbf{Yedukondalu Reddy Degala} \\
+  Email: \href{mailto:221fa04011@gmail.com}{221fa04011@gmail.com} \\[12pt]
+  Department of Computer Science and Engineering \\
+  Vignan's Foundation for Science, Technology \& Research
+}
+\date{}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\vfill
+\begin{center}
+  \textit{Submitted in partial fulfillment of the requirements for the degree of} \\
+  \textit{Bachelor of Technology in Computer Science and Engineering}
+\end{center}
+\newpage
+
+\setcounter{page}{1}
+
+% ============================================================
+\section{Abstract}
+% ============================================================
+
+The Autonomous Research Assistant is a web-based application designed to automate the discovery, summarization, and citation management of academic research papers. By leveraging external academic databases and natural language processing techniques, the system enables researchers to efficiently locate relevant literature, obtain concise summaries, extract key terminology, and generate properly formatted citations. This report presents the motivation, methodology, architecture, and current progress of the project.
+
+% ============================================================
+\section{Introduction}
+% ============================================================
+
+The volume of academic publications has grown exponentially over the past two decades. Researchers across all disciplines face the challenge of identifying, reading, and organizing an ever-increasing body of literature. Traditional manual literature review is time-consuming, error-prone, and often results in incomplete coverage of relevant work.
+
+There is a clear need for intelligent tools that can assist researchers in navigating large corpora of publications. The Autonomous Research Assistant addresses this need by providing a unified platform where users can search for papers, receive machine-generated summaries, and manage citations—all within a single interface.
+
+% ============================================================
+\section{Problem Statement}
+% ============================================================
+
+Researchers routinely spend a significant portion of their time on literature review activities such as searching for papers, reading lengthy abstracts, extracting key concepts, and formatting citations in various styles. These tasks are repetitive and do not require deep intellectual engagement, yet they consume considerable effort. Furthermore, manually maintaining consistency across citation formats (APA, MLA, IEEE) is a frequent source of errors. The lack of an integrated, automated solution for these tasks motivates the development of the Autonomous Research Assistant.
+
+% ============================================================
+\section{Objectives}
+% ============================================================
+
+The primary objectives of this project are:
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item To build a web application that enables automated discovery of research papers from large academic databases.
+  \item To implement text summarization techniques that condense paper abstracts into concise, readable summaries.
+  \item To extract key technical terms and keywords from research papers automatically.
+  \item To generate citations in multiple standard formats (APA, MLA, IEEE) without manual effort.
+  \item To provide project-based organization so that users can manage literature for multiple research topics simultaneously.
+  \item To enable export of citations and generation of presentation slides for academic reporting.
+\end{itemize}
+
+% ============================================================
+\section{Methodology}
+% ============================================================
+
+The system follows a structured pipeline consisting of the following stages:
+
+\begin{enumerate}[leftmargin=1.5cm]
+  \item \textbf{Data Collection:} Research paper metadata is retrieved from the Semantic Scholar Academic Graph API, which indexes over 200 million publications. The system queries the API with user-provided topics and retrieves titles, authors, abstracts, publication years, and venue information.
+
+  \item \textbf{Text Preprocessing:} Retrieved abstracts are cleaned and normalized before being passed to the analysis module. This includes handling of special characters, encoding issues, and incomplete records.
+
+  \item \textbf{Content Analysis:} A large language model (Google Gemini 2.5 Flash) is used to perform two key tasks: (a)~generating a 2--3 sentence summary of each abstract, and (b)~extracting 5--7 key technical terms that characterize the paper's contributions.
+
+  \item \textbf{Pattern Learning and Classification:} The extracted keywords and metadata are used to classify papers by research domain. This facilitates organization and retrieval within user-defined projects.
+
+  \item \textbf{Citation Generation:} Author names, titles, venues, and publication years are algorithmically formatted into APA, MLA, and IEEE citation styles, ensuring consistency and correctness.
+\end{enumerate}
+
+% ============================================================
+\section{System Architecture}
+% ============================================================
+
+The system architecture comprises four primary modules:
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{User Interface (Frontend):} Built using React.js with TypeScript and Tailwind CSS. The interface provides pages for authentication, project management, paper discovery, and presentation generation.
+
+  \item \textbf{Processing Module:} Implemented as serverless edge functions using the Deno runtime. This module orchestrates API calls to external services, performs text analysis, and manages data flow between the frontend and the database.
+
+  \item \textbf{Classification Module:} Utilizes machine learning--based language models to summarize content and extract keywords, enabling domain-level categorization of discovered papers.
+
+  \item \textbf{Output Module:} Supports bulk citation export as text files and client-side generation of PowerPoint presentations using the \texttt{pptxgenjs} library.
+\end{itemize}
+
+% ============================================================
+\section{Tools and Technologies Used}
+% ============================================================
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Category} & \textbf{Technology} \\ \hline
+Frontend Framework & React.js 18, TypeScript \\ \hline
+Build Tool & Vite \\ \hline
+Styling & Tailwind CSS, ShadCN/UI \\ \hline
+State Management & TanStack Query (React Query) \\ \hline
+Routing & React Router v6 \\ \hline
+Database & PostgreSQL with Row-Level Security \\ \hline
+Backend Functions & Deno Edge Functions \\ \hline
+Authentication & JWT-based session management \\ \hline
+Academic Data API & Semantic Scholar API \\ \hline
+NLP / ML Model & Google Gemini 2.5 Flash \\ \hline
+Presentation Export & pptxgenjs \\ \hline
+Languages & JavaScript, TypeScript, SQL \\ \hline
+\end{tabular}
+\caption{Tools and technologies used in the project.}
+\end{table}
+
+% ============================================================
+\section{Current Progress}
+% ============================================================
+
+The following milestones have been completed as of the current review:
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Dataset and API Integration:} The Semantic Scholar API has been integrated to fetch paper metadata based on user queries.
+  \item \textbf{Text Preprocessing and Summarization:} Abstracts are processed through the Gemini 2.5 Flash model to produce concise summaries and keyword lists.
+  \item \textbf{Citation Generation:} Automated citation formatting in APA, MLA, and IEEE styles has been implemented and tested.
+  \item \textbf{Frontend Interface:} A complete user interface has been developed, including landing, authentication, dashboard, project detail, and presentation pages.
+  \item \textbf{Database Design:} PostgreSQL tables with Row-Level Security policies have been set up to ensure per-user data isolation.
+  \item \textbf{Presentation Generator:} A 16-slide PowerPoint presentation can be generated and downloaded from within the application.
+\end{itemize}
+
+% ============================================================
+\section{Future Scope}
+% ============================================================
+
+Several enhancements are planned for future iterations of the system:
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item Improving classification accuracy through fine-tuned domain-specific models.
+  \item Integrating additional academic databases such as PubMed, IEEE Xplore, and arXiv for broader coverage.
+  \item Implementing automated literature review generation that synthesizes findings across multiple papers.
+  \item Adding collaborative features to allow multiple researchers to work on shared projects.
+  \item Supporting PDF upload and full-text analysis beyond abstracts.
+\end{itemize}
+
+% ============================================================
+\section{Conclusion}
+% ============================================================
+
+The Autonomous Research Assistant demonstrates a practical application of web technologies and natural language processing to address a real challenge faced by researchers. By automating paper discovery, summarization, keyword extraction, and citation formatting, the system significantly reduces the manual effort involved in literature review. The project successfully integrates a modern frontend, serverless backend, and external AI services into a cohesive platform. Future work will focus on expanding data sources, improving classification models, and adding collaborative capabilities.
+
+\end{document}
