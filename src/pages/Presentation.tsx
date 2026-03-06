@@ -89,7 +89,7 @@ const Presentation = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Total Slides</span>
-                <span className="text-2xl font-bold text-foreground">16</span>
+                <span className="text-2xl font-bold text-foreground">19</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Format</span>
