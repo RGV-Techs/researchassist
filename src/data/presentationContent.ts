@@ -139,6 +139,37 @@ export const presentationContent = {
       }
     ]
   },
+
+  mlDataset: {
+    title: "Dataset & Preprocessing",
+    points: [
+      "Dataset: arXiv Paper Abstracts (Kaggle) — 1.7M+ papers, CC0 license",
+      "Sampled 18,000 papers across 6 distinct research domains",
+      "Categories: Computer Vision, NLP, Astrophysics, Combinatorics, Neuroscience, HEP Theory",
+      "Preprocessing: Stopword removal, lemmatization, title weighting (3×)",
+      "Feature extraction: TF-IDF with 50,000 features, n-gram range (1,3)",
+      "Train/Test split: 80/20 stratified with 5-fold cross-validation"
+    ]
+  },
+
+  mlTraining: {
+    title: "ML Model Training & Results",
+    models: [
+      { name: "Logistic Regression", crossVal: "95.8%", testAcc: "96.1%" },
+      { name: "Multinomial Naive Bayes", crossVal: "93.2%", testAcc: "93.5%" },
+      { name: "SGD Classifier (Modified Huber)", crossVal: "95.6%", testAcc: "95.9%" },
+      { name: "Calibrated Linear SVC", crossVal: "96.0%", testAcc: "96.3%" }
+    ],
+    bestModel: "Calibrated Linear SVC — 96.3% Test Accuracy",
+    perClass: [
+      { domain: "Computer Vision", f1: "0.95" },
+      { domain: "NLP (cs.CL)", f1: "0.95" },
+      { domain: "Astrophysics", f1: "0.98" },
+      { domain: "Combinatorics", f1: "0.97" },
+      { domain: "Neuroscience", f1: "0.96" },
+      { domain: "HEP Theory", f1: "0.97" }
+    ]
+  },
   
   security: {
     title: "Security Implementation",

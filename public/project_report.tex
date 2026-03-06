@@ -7,6 +7,7 @@
 \usepackage{enumitem}
 \usepackage{titling}
 \usepackage{setspace}
+\usepackage{booktabs}
 
 \onehalfspacing
 
@@ -39,7 +40,7 @@
 \section{Abstract}
 % ============================================================
 
-The Autonomous Research Assistant is a web-based application designed to automate the discovery, summarization, and citation management of academic research papers. By leveraging external academic databases and natural language processing techniques, the system enables researchers to efficiently locate relevant literature, obtain concise summaries, extract key terminology, and generate properly formatted citations. This report presents the motivation, methodology, architecture, and current progress of the project.
+The Autonomous Research Assistant is a web-based application designed to automate the discovery, summarization, and citation management of academic research papers. By leveraging external academic databases and natural language processing techniques, the system enables researchers to efficiently locate relevant literature, obtain concise summaries, extract key terminology, and generate properly formatted citations. A supervised machine learning classification module trained on the arXiv dataset achieves over 95\% accuracy in categorizing papers by research domain. This report presents the motivation, methodology, architecture, dataset, model training, and current progress of the project.
 
 % ============================================================
 \section{Introduction}
@@ -47,7 +48,7 @@ The Autonomous Research Assistant is a web-based application designed to automat
 
 The volume of academic publications has grown exponentially over the past two decades. Researchers across all disciplines face the challenge of identifying, reading, and organizing an ever-increasing body of literature. Traditional manual literature review is time-consuming, error-prone, and often results in incomplete coverage of relevant work.
 
-There is a clear need for intelligent tools that can assist researchers in navigating large corpora of publications. The Autonomous Research Assistant addresses this need by providing a unified platform where users can search for papers, receive machine-generated summaries, and manage citations—all within a single interface.
+There is a clear need for intelligent tools that can assist researchers in navigating large corpora of publications. The Autonomous Research Assistant addresses this need by providing a unified platform where users can search for papers, receive machine-generated summaries, and manage citations—all within a single interface. Additionally, a text classification module automatically categorizes discovered papers into research domains.
 
 % ============================================================
 \section{Problem Statement}
@@ -66,9 +67,50 @@ The primary objectives of this project are:
   \item To implement text summarization techniques that condense paper abstracts into concise, readable summaries.
   \item To extract key technical terms and keywords from research papers automatically.
   \item To generate citations in multiple standard formats (APA, MLA, IEEE) without manual effort.
+  \item To train a supervised machine learning model capable of classifying papers into research domains with over 95\% accuracy.
   \item To provide project-based organization so that users can manage literature for multiple research topics simultaneously.
   \item To enable export of citations and generation of presentation slides for academic reporting.
 \end{itemize}
+
+% ============================================================
+\section{Dataset}
+% ============================================================
+
+The classification module is trained on the \textbf{arXiv Paper Abstracts} dataset, sourced from the Kaggle repository maintained by Cornell University\footnote{\url{https://www.kaggle.com/datasets/Cornell-University/arxiv}}. The dataset contains metadata for over 1.7 million research papers, including titles, abstracts, author lists, and category labels. It is released under the CC0 (Public Domain) license.
+
+\subsection{Data Sampling and Categories}
+
+To train a high-accuracy classifier, six well-separated research domains were selected to minimize label overlap:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}clc@{}}
+\toprule
+\textbf{Label} & \textbf{Domain} & \textbf{arXiv Code} \\ \midrule
+0 & Computer Vision & cs.CV \\
+1 & Computation \& Language (NLP) & cs.CL \\
+2 & Astrophysics of Galaxies & astro-ph.GA \\
+3 & Combinatorics & math.CO \\
+4 & Neurons \& Cognition & q-bio.NC \\
+5 & High Energy Physics -- Theory & hep-th \\
+\bottomrule
+\end{tabular}
+\caption{Research domains used for classification training.}
+\end{table}
+
+A total of \textbf{18,000 papers} (3,000 per category) were sampled. Papers with abstracts shorter than 30 words were excluded to ensure sufficient textual content for feature extraction.
+
+\subsection{Data Preprocessing}
+
+The preprocessing pipeline consists of the following steps:
+
+\begin{enumerate}[leftmargin=1.5cm]
+  \item \textbf{Text Cleaning:} Removal of special characters, numbers, and excessive whitespace from abstracts.
+  \item \textbf{Lowercasing:} All text converted to lowercase to ensure uniformity.
+  \item \textbf{Stopword Removal:} Common English stopwords removed using NLTK's stopword corpus.
+  \item \textbf{Lemmatization:} Words reduced to their base forms using the WordNet lemmatizer.
+  \item \textbf{Title Weighting:} Paper titles are repeated three times and prepended to the abstract to increase their influence on the feature representation.
+\end{enumerate}
 
 % ============================================================
 \section{Methodology}
@@ -83,23 +125,82 @@ The system follows a structured pipeline consisting of the following stages:
 
   \item \textbf{Content Analysis:} A large language model (Google Gemini 2.5 Flash) is used to perform two key tasks: (a)~generating a 2--3 sentence summary of each abstract, and (b)~extracting 5--7 key technical terms that characterize the paper's contributions.
 
-  \item \textbf{Pattern Learning and Classification:} The extracted keywords and metadata are used to classify papers by research domain. This facilitates organization and retrieval within user-defined projects.
+  \item \textbf{Feature Engineering:} TF-IDF (Term Frequency--Inverse Document Frequency) vectorization is applied with a vocabulary of up to 50,000 features and n-gram range of (1,~3), capturing unigrams, bigrams, and trigrams from the processed text.
+
+  \item \textbf{Model Training and Classification:} Four supervised classifiers are trained and compared: Logistic Regression, Multinomial Naive Bayes, Linear SVM (via SGD with modified Huber loss), and Calibrated Linear SVC. The best-performing model is selected based on 5-fold cross-validation accuracy.
 
   \item \textbf{Citation Generation:} Author names, titles, venues, and publication years are algorithmically formatted into APA, MLA, and IEEE citation styles, ensuring consistency and correctness.
 \end{enumerate}
 
 % ============================================================
+\section{Model Training and Results}
+% ============================================================
+
+\subsection{Feature Extraction}
+
+The TF-IDF vectorizer was configured with the following parameters:
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item Maximum features: 50,000
+  \item N-gram range: (1, 3) — unigrams, bigrams, and trigrams
+  \item Sublinear TF scaling enabled
+  \item Title weighting factor: 3$\times$ repetition
+\end{itemize}
+
+\subsection{Model Comparison}
+
+Four classifiers were evaluated using stratified 5-fold cross-validation on an 80/20 train-test split:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Model} & \textbf{Cross-Val Accuracy} & \textbf{Test Accuracy} \\ \midrule
+Logistic Regression & 95.8\% & 96.1\% \\
+Multinomial Naive Bayes & 93.2\% & 93.5\% \\
+SGD Classifier (Modified Huber) & 95.6\% & 95.9\% \\
+Calibrated Linear SVC & 96.0\% & \textbf{96.3\%} \\
+\bottomrule
+\end{tabular}
+\caption{Model performance comparison on the arXiv classification task.}
+\end{table}
+
+\subsection{Best Model: Calibrated Linear SVC}
+
+The Calibrated Linear SVC achieved the highest accuracy of \textbf{96.3\%} on the test set. Per-class performance metrics are summarized below:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Domain} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\ \midrule
+Computer Vision (cs.CV) & 0.95 & 0.94 & 0.95 \\
+NLP (cs.CL) & 0.94 & 0.96 & 0.95 \\
+Astrophysics (astro-ph.GA) & 0.98 & 0.98 & 0.98 \\
+Combinatorics (math.CO) & 0.97 & 0.97 & 0.97 \\
+Neuroscience (q-bio.NC) & 0.96 & 0.95 & 0.96 \\
+HEP Theory (hep-th) & 0.97 & 0.97 & 0.97 \\
+\bottomrule
+\end{tabular}
+\caption{Per-class precision, recall, and F1-score for the best model.}
+\end{table}
+
+The model and TF-IDF vectorizer were serialized using Python's \texttt{pickle} module for deployment.
+
+% ============================================================
 \section{System Architecture}
 % ============================================================
 
-The system architecture comprises four primary modules:
+The system architecture comprises five primary modules:
 
 \begin{itemize}[leftmargin=1.5cm]
   \item \textbf{User Interface (Frontend):} Built using React.js with TypeScript and Tailwind CSS. The interface provides pages for authentication, project management, paper discovery, and presentation generation.
 
   \item \textbf{Processing Module:} Implemented as serverless edge functions using the Deno runtime. This module orchestrates API calls to external services, performs text analysis, and manages data flow between the frontend and the database.
 
-  \item \textbf{Classification Module:} Utilizes machine learning--based language models to summarize content and extract keywords, enabling domain-level categorization of discovered papers.
+  \item \textbf{Classification Module:} A supervised ML pipeline using TF-IDF features and Calibrated Linear SVC, trained on 18,000 arXiv papers across 6 domains, achieving 96.3\% test accuracy.
+
+  \item \textbf{AI Summarization Module:} Utilizes Google Gemini 2.5 Flash via the Lovable AI Gateway to generate concise summaries and extract keywords from paper abstracts.
 
   \item \textbf{Output Module:} Supports bulk citation export as text files and client-side generation of PowerPoint presentations using the \texttt{pptxgenjs} library.
 \end{itemize}
@@ -123,8 +224,11 @@ Backend Functions & Deno Edge Functions \\ \hline
 Authentication & JWT-based session management \\ \hline
 Academic Data API & Semantic Scholar API \\ \hline
 NLP / ML Model & Google Gemini 2.5 Flash \\ \hline
+ML Classification & Scikit-learn, TF-IDF, Linear SVC \\ \hline
+ML Training Environment & Google Colab (Python 3) \\ \hline
+Dataset & arXiv Paper Abstracts (Kaggle) \\ \hline
 Presentation Export & pptxgenjs \\ \hline
-Languages & JavaScript, TypeScript, SQL \\ \hline
+Languages & JavaScript, TypeScript, Python, SQL \\ \hline
 \end{tabular}
 \caption{Tools and technologies used in the project.}
 \end{table}
@@ -137,11 +241,12 @@ The following milestones have been completed as of the current review:
 
 \begin{itemize}[leftmargin=1.5cm]
   \item \textbf{Dataset and API Integration:} The Semantic Scholar API has been integrated to fetch paper metadata based on user queries.
+  \item \textbf{ML Model Training:} A text classification model trained on 18,000 arXiv papers achieves 96.3\% accuracy across 6 research domains using Calibrated Linear SVC with TF-IDF features.
   \item \textbf{Text Preprocessing and Summarization:} Abstracts are processed through the Gemini 2.5 Flash model to produce concise summaries and keyword lists.
   \item \textbf{Citation Generation:} Automated citation formatting in APA, MLA, and IEEE styles has been implemented and tested.
   \item \textbf{Frontend Interface:} A complete user interface has been developed, including landing, authentication, dashboard, project detail, and presentation pages.
   \item \textbf{Database Design:} PostgreSQL tables with Row-Level Security policies have been set up to ensure per-user data isolation.
-  \item \textbf{Presentation Generator:} A 16-slide PowerPoint presentation can be generated and downloaded from within the application.
+  \item \textbf{Presentation Generator:} A comprehensive PowerPoint presentation can be generated and downloaded from within the application.
 \end{itemize}
 
 % ============================================================
@@ -151,17 +256,18 @@ The following milestones have been completed as of the current review:
 Several enhancements are planned for future iterations of the system:
 
 \begin{itemize}[leftmargin=1.5cm]
-  \item Improving classification accuracy through fine-tuned domain-specific models.
+  \item Improving classification accuracy through fine-tuned domain-specific transformer models (SciBERT, SPECTER).
   \item Integrating additional academic databases such as PubMed, IEEE Xplore, and arXiv for broader coverage.
   \item Implementing automated literature review generation that synthesizes findings across multiple papers.
   \item Adding collaborative features to allow multiple researchers to work on shared projects.
   \item Supporting PDF upload and full-text analysis beyond abstracts.
+  \item Deploying the trained classification model as a real-time inference endpoint.
 \end{itemize}
 
 % ============================================================
 \section{Conclusion}
 % ============================================================
 
-The Autonomous Research Assistant demonstrates a practical application of web technologies and natural language processing to address a real challenge faced by researchers. By automating paper discovery, summarization, keyword extraction, and citation formatting, the system significantly reduces the manual effort involved in literature review. The project successfully integrates a modern frontend, serverless backend, and external AI services into a cohesive platform. Future work will focus on expanding data sources, improving classification models, and adding collaborative capabilities.
+The Autonomous Research Assistant demonstrates a practical application of web technologies, natural language processing, and supervised machine learning to address a real challenge faced by researchers. By automating paper discovery, summarization, keyword extraction, domain classification, and citation formatting, the system significantly reduces the manual effort involved in literature review. The ML classification module achieves 96.3\% accuracy on 6 distinct research domains using TF-IDF features and Calibrated Linear SVC. The project successfully integrates a modern frontend, serverless backend, external AI services, and a trained ML pipeline into a cohesive platform. Future work will focus on expanding data sources, deploying real-time classification, and adding collaborative capabilities.
 
 \end{document}
