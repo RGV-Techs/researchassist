@@ -33,6 +33,9 @@ const Presentation = () => {
     { icon: Layers, title: "Data Flow", description: "End-to-end processing pipeline" },
     { icon: Lightbulb, title: "Key Features", description: "Discovery, AI, Citations" },
     { icon: Cpu, title: "AI Pipeline", description: "Summarization & keyword extraction" },
+    { icon: Database, title: "Dataset & Preprocessing", description: "arXiv 18K papers, TF-IDF" },
+    { icon: Cpu, title: "ML Model Results", description: "4 models compared, 96.3% accuracy" },
+    { icon: Cpu, title: "Per-Class Performance", description: "F1-scores per domain" },
     { icon: Shield, title: "Security", description: "RLS policies & JWT auth" },
     { icon: Shield, title: "Testing Strategy", description: "Unit, integration, security tests" },
     { icon: Clock, title: "Project Timeline", description: "12-week development phases" },
@@ -86,7 +89,7 @@ const Presentation = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Total Slides</span>
-                <span className="text-2xl font-bold text-foreground">16</span>
+                <span className="text-2xl font-bold text-foreground">19</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-muted-foreground">Format</span>

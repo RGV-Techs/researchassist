@@ -537,10 +537,29 @@ export function generateProjectPPT(): void {
   // Slide 9: AI Pipeline
   addAIPipelineSlide(pptx);
   
-  // Slide 10: Security
+  // Slide 10: ML Dataset & Preprocessing
+  addContentSlide(pptx, presentationContent.mlDataset.title, presentationContent.mlDataset.points);
+  
+  // Slide 11: ML Model Training & Results
+  addTableSlide(
+    pptx,
+    presentationContent.mlTraining.title,
+    ["Model", "Cross-Val Accuracy", "Test Accuracy"],
+    presentationContent.mlTraining.models.map(m => [m.name, m.crossVal, m.testAcc])
+  );
+  
+  // Slide 12: Per-Class F1 Scores
+  addTableSlide(
+    pptx,
+    "Per-Class Performance (Best Model: 96.3%)",
+    ["Domain", "F1-Score"],
+    presentationContent.mlTraining.perClass.map(c => [c.domain, c.f1])
+  );
+  
+  // Slide 13: Security
   addContentSlide(pptx, presentationContent.security.title, presentationContent.security.measures);
   
-  // Slide 11: Testing
+  // Slide 14: Testing
   addTwoColumnSlide(
     pptx,
     presentationContent.testing.title,
@@ -550,19 +569,19 @@ export function generateProjectPPT(): void {
     presentationContent.testing.categories[1].items
   );
   
-  // Slide 12: Timeline
+  // Slide 15: Timeline
   addTimelineSlide(pptx);
   
-  // Slide 13: Future Enhancements
+  // Slide 16: Future Enhancements
   addContentSlide(pptx, presentationContent.futureEnhancements.title, presentationContent.futureEnhancements.items);
   
-  // Slide 14: Conclusion
+  // Slide 17: Conclusion
   addConclusionSlide(pptx);
   
-  // Slide 15: References
+  // Slide 18: References
   addReferencesSlide(pptx);
   
-  // Slide 16: Thank You
+  // Slide 19: Thank You
   addThankYouSlide(pptx);
   
   // Save the file
