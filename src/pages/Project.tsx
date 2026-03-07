@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Search, Loader2, BookOpen, Download } from "lucide-react";
+import { ArrowLeft, Search, Loader2, BookOpen, Download, FileText, Presentation } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import PaperCard from "@/components/PaperCard";
+import { generateProjectPPT } from "@/lib/pptGenerator";
 
 interface Paper {
   id: string;
@@ -22,6 +23,7 @@ interface Paper {
   year: number;
   venue: string;
   url: string;
+  ml_category?: string;
 }
 
 interface Project {
@@ -109,7 +111,6 @@ const Project = () => {
       });
 
       if (error) throw error;
-
       fetchPapers();
     } catch (error: any) {
       toast.error(error.message || "Failed to discover papers");
@@ -121,14 +122,10 @@ const Project = () => {
   const exportCitations = (format: "apa" | "mla" | "ieee") => {
     const citations = papers.map(paper => {
       switch (format) {
-        case "apa":
-          return paper.citation_apa;
-        case "mla":
-          return paper.citation_mla;
-        case "ieee":
-          return paper.citation_ieee;
-        default:
-          return paper.citation_apa;
+        case "apa": return paper.citation_apa;
+        case "mla": return paper.citation_mla;
+        case "ieee": return paper.citation_ieee;
+        default: return paper.citation_apa;
       }
     }).join("\n\n");
 
@@ -139,7 +136,14 @@ const Project = () => {
     a.download = `citations-${format}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${papers.length} citations`);
+  };
+
+  const handleDownloadPPT = () => {
+    generateProjectPPT();
+  };
+
+  const handleDownloadReport = () => {
+    window.open("/project_report.tex", "_blank");
   };
 
   if (loading) {
@@ -158,15 +162,29 @@ const Project = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
           </Button>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="bg-primary/10 p-2 rounded-lg">
-              <BookOpen className="h-6 w-6 text-primary" />
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-primary/10 p-2 rounded-lg">
+                  <BookOpen className="h-6 w-6 text-primary" />
+                </div>
+                <h1 className="text-2xl font-bold">{project?.name}</h1>
+              </div>
+              {project?.description && (
+                <p className="text-muted-foreground">{project.description}</p>
+              )}
             </div>
-            <h1 className="text-2xl font-bold">{project?.name}</h1>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleDownloadPPT}>
+                <Presentation className="h-4 w-4 mr-2" />
+                Download PPT
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownloadReport}>
+                <FileText className="h-4 w-4 mr-2" />
+                Download Report
+              </Button>
+            </div>
           </div>
-          {project?.description && (
-            <p className="text-muted-foreground">{project.description}</p>
-          )}
         </div>
       </header>
 
