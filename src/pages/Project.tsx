@@ -110,7 +110,6 @@ const Project = () => {
 
       if (error) throw error;
 
-      toast.success(`Found ${data?.papers?.length || 0} papers`);
       fetchPapers();
     } catch (error: any) {
       toast.error(error.message || "Failed to discover papers");
