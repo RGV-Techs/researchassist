@@ -62,8 +62,17 @@ const PaperCard = ({ paper, index }: PaperCardProps) => {
           </p>
         </div>
 
+        {/* ML Classification Badge */}
+        {paper.keywords.some(k => k.startsWith("[ML:")) && (
+          <div className="mb-2">
+            <Badge className="bg-primary/15 text-primary border-primary/30 text-xs">
+              🧠 {paper.keywords.find(k => k.startsWith("[ML:"))?.replace("[ML:", "").replace("]", "")}
+            </Badge>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2">
-          {paper.keywords.slice(0, 5).map((keyword, i) => (
+          {paper.keywords.filter(k => !k.startsWith("[ML:")).slice(0, 5).map((keyword, i) => (
             <Badge key={i} variant="secondary" className="text-xs">
               {keyword}
             </Badge>
