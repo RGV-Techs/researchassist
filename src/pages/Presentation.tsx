@@ -13,9 +13,7 @@ const Presentation = () => {
   const handleDownload = async () => {
     setIsGenerating(true);
     try {
-      // Small delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 500));
-      generateProjectPPT();
+      await generateProjectPPT();
     } catch (error) {
       console.error("Error generating PPT:", error);
     } finally {
