@@ -544,8 +544,8 @@ export function generateProjectPPT(): void {
   addTableSlide(
     pptx,
     presentationContent.mlTraining.title,
-    ["Model", "Cross-Val Accuracy", "Test Accuracy"],
-    presentationContent.mlTraining.models.map(m => [m.name, m.crossVal, m.testAcc])
+    ["Model", "Accuracy", "F1 Score", "Precision"],
+    presentationContent.mlTraining.models.map(m => [m.name, m.accuracy, m.f1, m.precision])
   );
   
   // Slide 12: Per-Class F1 Scores
