@@ -551,9 +551,9 @@ export function generateProjectPPT(): void {
   // Slide 12: Per-Class F1 Scores
   addTableSlide(
     pptx,
-    "Per-Class Performance (Best Model: 96.3%)",
-    ["Domain", "F1-Score"],
-    presentationContent.mlTraining.perClass.map(c => [c.domain, c.f1])
+    "Per-Class Performance (Best Model: 97.25%)",
+    ["Domain", "Precision", "Recall", "F1-Score"],
+    presentationContent.mlTraining.perClass.map(c => [c.domain, c.precision, c.recall, c.f1])
   );
   
   // Slide 13: Security
