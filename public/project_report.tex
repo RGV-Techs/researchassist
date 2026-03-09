@@ -8,6 +8,9 @@
 \usepackage{titling}
 \usepackage{setspace}
 \usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{float}
 
 \onehalfspacing
 
@@ -40,7 +43,7 @@
 \section{Abstract}
 % ============================================================
 
-The Autonomous Research Assistant is a web-based application designed to automate the discovery, summarization, and citation management of academic research papers. By leveraging external academic databases and natural language processing techniques, the system enables researchers to efficiently locate relevant literature, obtain concise summaries, extract key terminology, and generate properly formatted citations. A supervised machine learning classification module trained on the arXiv dataset achieves over 95\% accuracy in categorizing papers by research domain. This report presents the motivation, methodology, architecture, dataset, model training, and current progress of the project.
+The Autonomous Research Assistant is a web-based application designed to automate the discovery, summarization, and citation management of academic research papers. By leveraging the Semantic Scholar API (200M+ papers) and Google Gemini 2.5 Flash for natural language processing, the system enables researchers to efficiently locate relevant literature, obtain concise AI-generated summaries, extract key terminology, and generate properly formatted citations in APA, MLA, and IEEE styles. A supervised machine learning classification pipeline trained on 18,000 arXiv paper abstracts across six research domains was evaluated over five classifiers; the best-performing model, a tuned \textbf{Linear SVM}, achieves \textbf{97.25\% test accuracy} and a macro F1-score of 0.97. This report presents the motivation, methodology, architecture, dataset, model training results, and current progress of the project.
 
 % ============================================================
 \section{Introduction}
@@ -48,7 +51,7 @@ The Autonomous Research Assistant is a web-based application designed to automat
 
 The volume of academic publications has grown exponentially over the past two decades. Researchers across all disciplines face the challenge of identifying, reading, and organizing an ever-increasing body of literature. Traditional manual literature review is time-consuming, error-prone, and often results in incomplete coverage of relevant work.
 
-There is a clear need for intelligent tools that can assist researchers in navigating large corpora of publications. The Autonomous Research Assistant addresses this need by providing a unified platform where users can search for papers, receive machine-generated summaries, and manage citations—all within a single interface. Additionally, a text classification module automatically categorizes discovered papers into research domains.
+There is a clear need for intelligent tools that can assist researchers in navigating large corpora of publications. The Autonomous Research Assistant addresses this need by providing a unified platform where users can search for papers, receive machine-generated summaries, and manage citations—all within a single interface. Additionally, a text classification module automatically categorizes discovered papers into six distinct research domains.
 
 % ============================================================
 \section{Problem Statement}
@@ -63,170 +66,243 @@ Researchers routinely spend a significant portion of their time on literature re
 The primary objectives of this project are:
 
 \begin{itemize}[leftmargin=1.5cm]
-  \item To build a web application that enables automated discovery of research papers from large academic databases.
-  \item To implement text summarization techniques that condense paper abstracts into concise, readable summaries.
-  \item To extract key technical terms and keywords from research papers automatically.
-  \item To generate citations in multiple standard formats (APA, MLA, IEEE) without manual effort.
-  \item To train a supervised machine learning model capable of classifying papers into research domains with over 95\% accuracy.
+  \item To build a web application that enables automated discovery of research papers from large academic databases (200M+ papers via Semantic Scholar).
+  \item To implement AI-powered text summarization using Google Gemini 2.5 Flash that condenses paper abstracts into concise 2--3 sentence summaries.
+  \item To extract 5--7 domain-specific key technical terms and keywords from each research paper automatically.
+  \item To generate citations in multiple standard formats (APA 7th, MLA 9th, IEEE) without manual effort.
+  \item To train and compare five supervised machine learning classifiers on the arXiv dataset, achieving over 97\% test accuracy.
   \item To provide project-based organization so that users can manage literature for multiple research topics simultaneously.
-  \item To enable export of citations and generation of presentation slides for academic reporting.
+  \item To enable export of citations and generation of PowerPoint presentation slides for academic reporting.
 \end{itemize}
+
+% ============================================================
+\section{System Architecture}
+% ============================================================
+
+The system architecture comprises six layers:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Layer} & \textbf{Technologies} \\ \midrule
+Presentation & React 18 + TypeScript + Tailwind CSS + ShadCN/UI \\
+State Management & TanStack Query + React Hook Form + Zod \\
+Authentication & JWT-based Auth (Email/Password) + Session Mgmt \\
+Backend Services & Deno Edge Functions (Serverless) + AI Gateway \\
+Database & PostgreSQL + Row-Level Security (RLS) \\
+External Services & Semantic Scholar API + Google Gemini 2.5 Flash \\
+\bottomrule
+\end{tabular}
+\caption{System architecture layers and technologies.}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/system_architecture.png}
+\caption{Layered system architecture of the Autonomous Research Assistant.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Paper Discovery Pipeline}
+
+The core pipeline, shown in Figure~\ref{fig:dataflow}, is implemented as a Deno-based Edge Function:
+
+\begin{enumerate}[leftmargin=1.5cm]
+  \item User submits a search query through the React frontend.
+  \item The Edge Function queries the Semantic Scholar API with retry logic (3 attempts, exponential backoff: 2s, 4s).
+  \item On API unavailability, Gemini 2.5 Flash generates realistic paper metadata as a fallback.
+  \item Each abstract is summarized to 2--3 sentences and 5--7 keywords are extracted via Gemini.
+  \item Papers are classified into one of six domains using a Gemini prompt encoding the trained SVM taxonomy.
+  \item APA, MLA, and IEEE citations are auto-generated from structured metadata.
+  \item All enriched data is stored in PostgreSQL with user-scoped RLS policies.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/data_flow.png}
+\caption{End-to-end paper discovery pipeline data flow.}
+\label{fig:dataflow}
+\end{figure}
+
+\subsection{Security}
+
+Security is implemented through JWT-based authentication with session refresh, Row-Level Security on all database tables (strict per-user data isolation), input validation in Edge Functions, HTTPS for all API communications, and environment-variable-based API key management.
 
 % ============================================================
 \section{Dataset}
 % ============================================================
 
-The classification module is trained on the \textbf{arXiv Paper Abstracts} dataset, sourced from the Kaggle repository maintained by Cornell University\footnote{\url{https://www.kaggle.com/datasets/Cornell-University/arxiv}}. The dataset contains metadata for over 1.7 million research papers, including titles, abstracts, author lists, and category labels. It is released under the CC0 (Public Domain) license.
+The classification module is trained on the \textbf{arXiv Paper Abstracts} dataset from Cornell University via Kaggle\footnote{\url{https://www.kaggle.com/datasets/Cornell-University/arxiv}}. The full dataset contains metadata for over 1.7 million research papers; it is released under the CC0 (Public Domain) license.
 
 \subsection{Data Sampling and Categories}
 
-To train a high-accuracy classifier, six well-separated research domains were selected to minimize label overlap:
+To maximize inter-domain separability and minimize classification ambiguity, six non-overlapping research domains were selected:
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
-\begin{tabular}{@{}clc@{}}
+\begin{tabular}{@{}clcc@{}}
 \toprule
-\textbf{Label} & \textbf{Domain} & \textbf{arXiv Code} \\ \midrule
-0 & Computer Vision & cs.CV \\
-1 & Computation \& Language (NLP) & cs.CL \\
-2 & Astrophysics of Galaxies & astro-ph.GA \\
-3 & Combinatorics & math.CO \\
-4 & Neurons \& Cognition & q-bio.NC \\
-5 & High Energy Physics -- Theory & hep-th \\
+\textbf{Label} & \textbf{Domain} & \textbf{arXiv Code} & \textbf{Samples} \\ \midrule
+0 & Astrophysics of Galaxies & astro-ph.GA & 3,000 \\
+1 & Computation \& Language (NLP) & cs.CL & 3,000 \\
+2 & Computer Vision & cs.CV & 3,000 \\
+3 & High Energy Physics -- Theory & hep-th & 3,000 \\
+4 & Combinatorics & math.CO & 3,000 \\
+5 & Neurons \& Cognition (Neuroscience) & q-bio.NC & 3,000 \\
+\midrule
+ & \textbf{Total} & & \textbf{18,000} \\
 \bottomrule
 \end{tabular}
-\caption{Research domains used for classification training.}
+\caption{Research domains used for ML classification training (3,000 papers per class).}
 \end{table}
 
-A total of \textbf{18,000 papers} (3,000 per category) were sampled. Papers with abstracts shorter than 30 words were excluded to ensure sufficient textual content for feature extraction.
+Papers with abstracts shorter than 30 words were excluded to ensure sufficient textual content for feature extraction. The dataset was split 80/20 stratified: 14,400 training samples and 3,600 test samples.
 
 \subsection{Data Preprocessing}
 
 The preprocessing pipeline consists of the following steps:
 
 \begin{enumerate}[leftmargin=1.5cm]
-  \item \textbf{Text Cleaning:} Removal of special characters, numbers, and excessive whitespace from abstracts.
-  \item \textbf{Lowercasing:} All text converted to lowercase to ensure uniformity.
-  \item \textbf{Stopword Removal:} Common English stopwords removed using NLTK's stopword corpus.
-  \item \textbf{Lemmatization:} Words reduced to their base forms using the WordNet lemmatizer.
-  \item \textbf{Title Weighting:} Paper titles are repeated three times and prepended to the abstract to increase their influence on the feature representation.
+  \item \textbf{Lowercasing:} All text converted to lowercase.
+  \item \textbf{Special Character Removal:} Non-alphabetic characters removed (hyphens preserved for compound terms).
+  \item \textbf{Tokenization:} NLTK word tokenizer.
+  \item \textbf{Stopword Removal:} Standard English stopwords plus 24 domain-generic academic terms (``paper'', ``propose'', ``method'', etc.).
+  \item \textbf{Lemmatization:} WordNet-based lemmatization to normalize morphological variants.
+  \item \textbf{Token Filtering:} Tokens shorter than 3 characters discarded.
+  \item \textbf{Title Weighting:} Paper titles are cleaned and repeated twice, then prepended to the abstract to amplify title signal in the feature representation.
 \end{enumerate}
 
 % ============================================================
 \section{Methodology}
 % ============================================================
 
-The system follows a structured pipeline consisting of the following stages:
+\subsection{Feature Engineering}
 
-\begin{enumerate}[leftmargin=1.5cm]
-  \item \textbf{Data Collection:} Research paper metadata is retrieved from the Semantic Scholar Academic Graph API, which indexes over 200 million publications. The system queries the API with user-provided topics and retrieves titles, authors, abstracts, publication years, and venue information.
+TF-IDF (Term Frequency--Inverse Document Frequency) vectorization was applied with the following configuration:
 
-  \item \textbf{Text Preprocessing:} Retrieved abstracts are cleaned and normalized before being passed to the analysis module. This includes handling of special characters, encoding issues, and incomplete records.
+\begin{table}[H]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\ \midrule
+Maximum features & 50,000 \\
+N-gram range & (1, 3) — unigrams, bigrams, trigrams \\
+Sublinear TF scaling & Enabled ($1 + \log(\text{tf})$) \\
+Max document frequency & 0.95 \\
+Min document frequency & 2 \\
+\bottomrule
+\end{tabular}
+\caption{TF-IDF vectorizer configuration.}
+\end{table}
 
-  \item \textbf{Content Analysis:} A large language model (Google Gemini 2.5 Flash) is used to perform two key tasks: (a)~generating a 2--3 sentence summary of each abstract, and (b)~extracting 5--7 key technical terms that characterize the paper's contributions.
+The resulting feature matrix has dimensionality $14{,}400 \times 50{,}000$ (training) and $3{,}600 \times 50{,}000$ (test).
 
-  \item \textbf{Feature Engineering:} TF-IDF (Term Frequency--Inverse Document Frequency) vectorization is applied with a vocabulary of up to 50,000 features and n-gram range of (1,~3), capturing unigrams, bigrams, and trigrams from the processed text.
+\subsection{ML Pipeline Overview}
 
-  \item \textbf{Model Training and Classification:} Four supervised classifiers are trained and compared: Logistic Regression, Multinomial Naive Bayes, Linear SVM (via SGD with modified Huber loss), and Calibrated Linear SVC. The best-performing model is selected based on 5-fold cross-validation accuracy.
-
-  \item \textbf{Citation Generation:} Author names, titles, venues, and publication years are algorithmically formatted into APA, MLA, and IEEE citation styles, ensuring consistency and correctness.
-\end{enumerate}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/ml_pipeline.png}
+\caption{End-to-end ML classification pipeline from arXiv dataset to production deployment.}
+\label{fig:mlpipeline}
+\end{figure}
 
 % ============================================================
 \section{Model Training and Results}
 % ============================================================
 
-\subsection{Feature Extraction}
+Five supervised classifiers were trained and evaluated using stratified 5-fold cross-validation on the 80/20 train-test split.
 
-The TF-IDF vectorizer was configured with the following parameters:
+\subsection{Classifier Descriptions}
 
-\begin{itemize}[leftmargin=1.5cm]
-  \item Maximum features: 50,000
-  \item N-gram range: (1, 3) — unigrams, bigrams, and trigrams
-  \item Sublinear TF scaling enabled
-  \item Title weighting factor: 3$\times$ repetition
-\end{itemize}
+\begin{enumerate}[leftmargin=1.5cm]
+  \item \textbf{Logistic Regression:} L2-regularized, $C=5.0$, \texttt{lbfgs} solver, 2000 iterations, multinomial.
+  \item \textbf{Multinomial Naive Bayes:} Laplace smoothing $\alpha=0.01$.
+  \item \textbf{Linear SVM (Tuned):} \texttt{LinearSVC} with $C=1.0$, 5000 iterations, wrapped in \texttt{CalibratedClassifierCV} (3-fold, Platt scaling).
+  \item \textbf{SGD Classifier:} Modified Huber loss, $\alpha=10^{-5}$, L2 penalty, 2000 iterations.
+  \item \textbf{Random Forest:} 500 estimators, no depth constraint.
+\end{enumerate}
 
 \subsection{Model Comparison}
 
-Four classifiers were evaluated using stratified 5-fold cross-validation on an 80/20 train-test split:
-
-\begin{table}[h]
+\begin{table}[H]
 \centering
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Model} & \textbf{Cross-Val Accuracy} & \textbf{Test Accuracy} \\ \midrule
-Logistic Regression & 95.8\% & 96.1\% \\
-Multinomial Naive Bayes & 93.2\% & 93.5\% \\
-SGD Classifier (Modified Huber) & 95.6\% & 95.9\% \\
-Calibrated Linear SVC & 96.0\% & \textbf{96.3\%} \\
+\textbf{Model} & \textbf{CV Acc.} & \textbf{Test Acc.} & \textbf{F1} & \textbf{Precision} \\ \midrule
+Logistic Regression & -- & 97.06\% & 0.9706 & 0.9707 \\
+Multinomial Naive Bayes & -- & 96.69\% & 0.9669 & 0.9670 \\
+\textbf{Linear SVM (Tuned)} & \textbf{96.17\% $\pm$ 0.45\%} & \textbf{97.25\%} & \textbf{0.9725} & \textbf{0.9726} \\
+SGD Classifier & -- & 97.03\% & 0.9703 & 0.9703 \\
+Random Forest & -- & 94.44\% & 0.9445 & 0.9454 \\
 \bottomrule
 \end{tabular}
-\caption{Model performance comparison on the arXiv classification task.}
+\caption{Model comparison on the arXiv 6-domain classification task. Best results in bold.}
 \end{table}
 
-\subsection{Best Model: Calibrated Linear SVC}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{images/model_comparison.png}
+\caption{Accuracy and F1-score comparison across all five classifiers.}
+\label{fig:modelcomp}
+\end{figure}
 
-The Calibrated Linear SVC achieved the highest accuracy of \textbf{96.3\%} on the test set. Per-class performance metrics are summarized below:
+\subsection{Best Model: Tuned Linear SVM}
 
-\begin{table}[h]
+The tuned Linear SVM (CalibratedClassifierCV) achieved the highest accuracy of \textbf{97.25\%} on the test set with a 5-fold cross-validation accuracy of \textbf{96.17\% $\pm$ 0.45\%}. Per-class performance metrics are summarized below:
+
+\begin{table}[H]
 \centering
 \begin{tabular}{@{}lccc@{}}
 \toprule
 \textbf{Domain} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\ \midrule
-Computer Vision (cs.CV) & 0.95 & 0.94 & 0.95 \\
-NLP (cs.CL) & 0.94 & 0.96 & 0.95 \\
-Astrophysics (astro-ph.GA) & 0.98 & 0.98 & 0.98 \\
-Combinatorics (math.CO) & 0.97 & 0.97 & 0.97 \\
-Neuroscience (q-bio.NC) & 0.96 & 0.95 & 0.96 \\
+Astrophysics (astro-ph.GA) & 0.99 & 0.98 & 0.98 \\
+NLP (cs.CL) & 0.98 & 0.98 & 0.98 \\
+Computer Vision (cs.CV) & 0.97 & 0.95 & 0.96 \\
 HEP Theory (hep-th) & 0.97 & 0.97 & 0.97 \\
+Combinatorics (math.CO) & 0.96 & 0.98 & 0.97 \\
+Neuroscience (q-bio.NC) & 0.96 & 0.97 & 0.97 \\
+\midrule
+\textbf{Macro Avg.} & \textbf{0.97} & \textbf{0.97} & \textbf{0.97} \\
 \bottomrule
 \end{tabular}
-\caption{Per-class precision, recall, and F1-score for the best model.}
+\caption{Per-class precision, recall, and F1-score for the best model (Linear SVM, Tuned).}
 \end{table}
 
-The model and TF-IDF vectorizer were serialized using Python's \texttt{pickle} module for deployment.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{images/confusion_matrix.png}
+\caption{Confusion matrix for the tuned Linear SVM on the 3,600-sample test set.}
+\label{fig:confmat}
+\end{figure}
 
-% ============================================================
-\section{System Architecture}
-% ============================================================
+\subsection{Production Deployment}
 
-The system architecture comprises five primary modules:
-
-\begin{itemize}[leftmargin=1.5cm]
-  \item \textbf{User Interface (Frontend):} Built using React.js with TypeScript and Tailwind CSS. The interface provides pages for authentication, project management, paper discovery, and presentation generation.
-
-  \item \textbf{Processing Module:} Implemented as serverless edge functions using the Deno runtime. This module orchestrates API calls to external services, performs text analysis, and manages data flow between the frontend and the database.
-
-  \item \textbf{Classification Module:} A supervised ML pipeline using TF-IDF features and Calibrated Linear SVC, trained on 18,000 arXiv papers across 6 domains, achieving 96.3\% test accuracy.
-
-  \item \textbf{AI Summarization Module:} Utilizes Google Gemini 2.5 Flash via the Lovable AI Gateway to generate concise summaries and extract keywords from paper abstracts.
-
-  \item \textbf{Output Module:} Supports bulk citation export as text files and client-side generation of PowerPoint presentations using the \texttt{pptxgenjs} library.
-\end{itemize}
+The trained classifier's domain taxonomy is integrated into the production application via a \textbf{prompt-engineering approach}: the Edge Function invokes Gemini 2.5 Flash with a classification prompt encoding the six-domain taxonomy derived from the trained SVM. This avoids the need to run a Python runtime in the Deno serverless environment while leveraging the ML model's validated knowledge.
 
 % ============================================================
 \section{Tools and Technologies Used}
 % ============================================================
 
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{|l|l|}
 \hline
 \textbf{Category} & \textbf{Technology} \\ \hline
 Frontend Framework & React.js 18, TypeScript \\ \hline
-Build Tool & Vite \\ \hline
+Build Tool & Vite 5 \\ \hline
 Styling & Tailwind CSS, ShadCN/UI \\ \hline
 State Management & TanStack Query (React Query) \\ \hline
 Routing & React Router v6 \\ \hline
 Database & PostgreSQL with Row-Level Security \\ \hline
-Backend Functions & Deno Edge Functions \\ \hline
+Backend Functions & Deno Edge Functions (Serverless) \\ \hline
 Authentication & JWT-based session management \\ \hline
-Academic Data API & Semantic Scholar API \\ \hline
-NLP / ML Model & Google Gemini 2.5 Flash \\ \hline
-ML Classification & Scikit-learn, TF-IDF, Linear SVC \\ \hline
-ML Training Environment & Google Colab (Python 3) \\ \hline
-Dataset & arXiv Paper Abstracts (Kaggle) \\ \hline
+Academic Data API & Semantic Scholar API (200M+ papers) \\ \hline
+AI / LLM & Google Gemini 2.5 Flash \\ \hline
+ML Framework & scikit-learn (TF-IDF + LinearSVC) \\ \hline
+ML Training Environment & Google Colab (Python 3.10+) \\ \hline
+Text Processing & NLTK (tokenization, stopwords, lemmatization) \\ \hline
+Dataset & arXiv Paper Abstracts (Kaggle, CC0) \\ \hline
 Presentation Export & pptxgenjs \\ \hline
 Languages & JavaScript, TypeScript, Python, SQL \\ \hline
 \end{tabular}
@@ -240,34 +316,39 @@ Languages & JavaScript, TypeScript, Python, SQL \\ \hline
 The following milestones have been completed as of the current review:
 
 \begin{itemize}[leftmargin=1.5cm]
-  \item \textbf{Dataset and API Integration:} The Semantic Scholar API has been integrated to fetch paper metadata based on user queries.
-  \item \textbf{ML Model Training:} A text classification model trained on 18,000 arXiv papers achieves 96.3\% accuracy across 6 research domains using Calibrated Linear SVC with TF-IDF features.
-  \item \textbf{Text Preprocessing and Summarization:} Abstracts are processed through the Gemini 2.5 Flash model to produce concise summaries and keyword lists.
-  \item \textbf{Citation Generation:} Automated citation formatting in APA, MLA, and IEEE styles has been implemented and tested.
-  \item \textbf{Frontend Interface:} A complete user interface has been developed, including landing, authentication, dashboard, project detail, and presentation pages.
-  \item \textbf{Database Design:} PostgreSQL tables with Row-Level Security policies have been set up to ensure per-user data isolation.
-  \item \textbf{Presentation Generator:} A comprehensive PowerPoint presentation can be generated and downloaded from within the application.
+  \item \textbf{Dataset and API Integration:} Semantic Scholar API integrated with retry logic and AI fallback; 200M+ papers accessible.
+  \item \textbf{ML Model Training:} Five classifiers trained and compared on 18,000 arXiv papers; best model (tuned Linear SVM) achieves 97.25\% test accuracy and 96.17\% $\pm$ 0.45\% CV accuracy.
+  \item \textbf{AI Summarization and Keyword Extraction:} Gemini 2.5 Flash generates 2--3 sentence summaries and 5--7 keywords per paper.
+  \item \textbf{Domain Classification:} Six-class taxonomy deployed via prompt engineering in the production Edge Function.
+  \item \textbf{Citation Generation:} Automated citation formatting in APA 7th, MLA 9th, and IEEE styles implemented and tested.
+  \item \textbf{Frontend Interface:} Complete user interface covering authentication, dashboard, project detail, and presentation pages.
+  \item \textbf{Database Design:} PostgreSQL tables with RLS policies ensuring per-user data isolation.
+  \item \textbf{Presentation Generator:} 23-slide PowerPoint presentation (including ML results tables and architecture diagrams) auto-generated from within the application.
+  \item \textbf{Documentation:} 6-page IEEE conference paper and B.Tech project report generated with full experimental results, figures, and bibliography.
 \end{itemize}
 
 % ============================================================
 \section{Future Scope}
 % ============================================================
 
-Several enhancements are planned for future iterations of the system:
-
 \begin{itemize}[leftmargin=1.5cm]
-  \item Improving classification accuracy through fine-tuned domain-specific transformer models (SciBERT, SPECTER).
-  \item Integrating additional academic databases such as PubMed, IEEE Xplore, and arXiv for broader coverage.
-  \item Implementing automated literature review generation that synthesizes findings across multiple papers.
-  \item Adding collaborative features to allow multiple researchers to work on shared projects.
-  \item Supporting PDF upload and full-text analysis beyond abstracts.
-  \item Deploying the trained classification model as a real-time inference endpoint.
+  \item Improving classification accuracy using fine-tuned domain-specific transformer models (SciBERT, SPECTER).
+  \item Integrating additional academic databases: PubMed, IEEE Xplore, and arXiv direct API.
+  \item Implementing automated literature review synthesis across multiple papers.
+  \item Adding collaborative features for team-based shared research projects.
+  \item Supporting PDF upload and full-text analysis beyond abstracts via GROBID.
+  \item Deploying the scikit-learn model as a real-time REST inference endpoint.
+  \item Paper similarity detection and recommendation engine based on reading history.
 \end{itemize}
 
 % ============================================================
 \section{Conclusion}
 % ============================================================
 
-The Autonomous Research Assistant demonstrates a practical application of web technologies, natural language processing, and supervised machine learning to address a real challenge faced by researchers. By automating paper discovery, summarization, keyword extraction, domain classification, and citation formatting, the system significantly reduces the manual effort involved in literature review. The ML classification module achieves 96.3\% accuracy on 6 distinct research domains using TF-IDF features and Calibrated Linear SVC. The project successfully integrates a modern frontend, serverless backend, external AI services, and a trained ML pipeline into a cohesive platform. Future work will focus on expanding data sources, deploying real-time classification, and adding collaborative capabilities.
+The Autonomous Research Assistant demonstrates a practical integration of modern web technologies, large language models, and supervised machine learning to address a real challenge faced by academic researchers. The system automates paper discovery from a 200M+ paper corpus, generates AI-powered summaries and keyword extractions, classifies papers into research domains, and formats citations in three standard styles.
+
+The ML classification module was rigorously evaluated across five classifiers trained on 18,000 arXiv paper abstracts. The tuned Linear SVM emerged as the best model with \textbf{97.25\% test accuracy} and a macro F1-score of 0.97, outperforming Logistic Regression (97.06\%), SGD Classifier (97.03\%), Multinomial Naive Bayes (96.69\%), and Random Forest (94.44\%). The model's six-domain taxonomy is successfully deployed in the production Edge Function through prompt engineering with Gemini 2.5 Flash.
+
+The project successfully integrates a React 18 frontend, Deno serverless backend, PostgreSQL database with RLS, and external AI services into a cohesive, secure platform. Future work will focus on transformer-based classification, expanded data sources, and collaborative features.
 
 \end{document}
