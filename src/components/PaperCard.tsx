@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, BookmarkPlus, ChevronDown, ChevronUp } from "lucide-react";
+import { ExternalLink, BookmarkPlus, ChevronDown, ChevronUp, FileDown } from "lucide-react";
+import { generatePaperReport } from "@/lib/paperReportGenerator";
 
 interface PaperCardProps {
   paper: {
