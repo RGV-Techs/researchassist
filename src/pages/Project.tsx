@@ -111,13 +111,15 @@ const Project = () => {
     toast.info("Discovering papers... This may take a moment.");
     try {
       const { data, error } = await supabase.functions.invoke("discover-papers", {
-        body: { topic: searchTopic, projectId: id },
+        body: { topic: searchTopic, projectId: id, offset: 0 },
       });
 
       if (error) throw error;
       
       const count = data?.papers || 0;
       toast.success(`Found ${count} papers!`);
+      setLastSearchTopic(searchTopic);
+      setSearchOffset(5);
       fetchPapers();
     } catch (error: any) {
       toast.error(error.message || "Failed to discover papers");
