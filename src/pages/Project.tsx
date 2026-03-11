@@ -138,8 +138,15 @@ const Project = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadPPT = () => {
-    generateProjectPPT();
+  const handleDownloadPPT = async () => {
+    try {
+      toast.info("Generating presentation...");
+      await generateProjectPPT();
+      toast.success("Presentation downloaded!");
+    } catch (error) {
+      console.error("PPT generation error:", error);
+      toast.error("Failed to generate presentation");
+    }
   };
 
   const handleDownloadReport = () => {
