@@ -16,6 +16,63 @@ interface Paper {
   paperId: string;
 }
 
+// Single AI call that returns summary, keywords, and classification together
+async function enrichPaperWithAI(
+  paper: Paper,
+  lovableApiKey: string
+): Promise<{ summary: string; keywords: string[]; mlCategory: string }> {
+  const fallback = {
+    summary: paper.abstract?.substring(0, 200) + "..." || "",
+    keywords: [],
+    mlCategory: "Uncategorized",
+  };
+
+  if (!paper.abstract) return fallback;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${lovableApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content: `You are a research assistant. Given a paper title and abstract, return a JSON object with exactly these fields:
+1. "summary": A concise 2-3 sentence summary of the abstract.
+2. "keywords": An array of 5-7 key technical terms.
+3. "mlCategory": Classify into exactly ONE of: Computer Vision, Natural Language Processing, Astrophysics, Combinatorics, Neuroscience, High Energy Physics, Machine Learning, Mathematics, Biology, Chemistry, Economics, Other.
+Return ONLY valid JSON, no markdown.`
+          },
+          {
+            role: "user",
+            content: `Title: ${paper.title}\n\nAbstract: ${paper.abstract}`
+          }
+        ],
+      }),
+    });
+
+    if (!response.ok) return fallback;
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+
+    return {
+      summary: parsed.summary || fallback.summary,
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : fallback.keywords,
+      mlCategory: parsed.mlCategory || fallback.mlCategory,
+    };
+  } catch (error) {
+    console.error("AI enrichment error:", error);
+    return fallback;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,16 +80,21 @@ serve(async (req) => {
 
   try {
     const { topic, projectId } = await req.json();
-    
+
     if (!topic || !projectId) {
       throw new Error("Topic and projectId are required");
     }
 
     console.log("Searching for papers on topic:", topic);
 
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     // Fetch papers from Semantic Scholar API with retry logic
     const semanticScholarUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(topic)}&limit=5&fields=title,authors,abstract,year,venue,url,paperId`;
-    
+
     let response: Response | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) {
@@ -41,17 +103,17 @@ serve(async (req) => {
       }
       response = await fetch(semanticScholarUrl);
       if (response.ok || response.status !== 429) break;
-      await response.text(); // consume body
+      await response.text();
     }
-    
+
+    let papers: Paper[] = [];
+
     if (!response || !response.ok) {
       const status = response?.status || "unknown";
       console.error("Semantic Scholar API error:", status);
-      
-      // Fallback: use AI to generate relevant paper suggestions
+
       if (status === 429) {
-        console.log("Rate limited, using AI fallback to generate paper data");
-        const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+        console.log("Rate limited, using AI fallback");
         const fallbackResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -63,7 +125,7 @@ serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: "You are an academic research assistant. Generate 5 real, well-known research papers related to the given topic. For each paper return a JSON array with objects having: title, authors (array of strings), abstract (2-3 sentences), year (number), venue (string), url (empty string), paperId (empty string). Return ONLY valid JSON, no markdown."
+                content: "Generate 5 real, well-known research papers related to the given topic. Return a JSON array with objects: title, authors (string array), abstract (2-3 sentences), year (number), venue (string), url (empty string), paperId (empty string). Return ONLY valid JSON."
               },
               { role: "user", content: `Generate 5 real research papers about: ${topic}` }
             ],
@@ -74,187 +136,64 @@ serve(async (req) => {
           const fallbackData = await fallbackResponse.json();
           const content = fallbackData.choices?.[0]?.message?.content || "[]";
           try {
-            const cleanContent = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-            const fallbackPapers = JSON.parse(cleanContent);
-            // Process fallback papers the same way
-            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-            const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-            const supabase = createClient(supabaseUrl, supabaseKey);
-
-            for (const paper of fallbackPapers) {
-              const authorNames = Array.isArray(paper.authors) ? paper.authors.join(", ") : "Unknown";
-              const citationApa = `${authorNames} (${paper.year}). ${paper.title}. ${paper.venue || "Conference/Journal"}.`;
-              const citationMla = `${authorNames}. "${paper.title}." ${paper.venue || "Conference/Journal"} (${paper.year}).`;
-              const citationIeee = `${authorNames}, "${paper.title}," ${paper.venue || "Conference/Journal"}, ${paper.year}.`;
-
-              await supabase.from("papers").insert({
-                project_id: projectId,
-                title: paper.title,
-                authors: Array.isArray(paper.authors) ? paper.authors : [authorNames],
-                abstract: paper.abstract || "",
-                summary: paper.abstract || "",
-                keywords: [`[ML:${topic}]`],
-                citation_apa: citationApa,
-                citation_mla: citationMla,
-                citation_ieee: citationIeee,
-                year: paper.year || new Date().getFullYear(),
-                venue: paper.venue || "Unknown",
-                url: paper.url || "",
-                external_id: paper.paperId || "",
-              });
-            }
-
-            return new Response(
-              JSON.stringify({ success: true, papers: fallbackPapers.length, source: "ai-fallback" }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+            const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+            papers = JSON.parse(cleaned);
           } catch (parseErr) {
             console.error("Failed to parse AI fallback:", parseErr);
+            throw new Error("Rate limited and AI fallback failed. Please try again.");
           }
+        } else {
+          throw new Error(`Semantic Scholar API returned ${status}. Please try again.`);
         }
+      } else {
+        throw new Error(`Semantic Scholar API returned ${status}. Please try again.`);
       }
-      
-      throw new Error(`Semantic Scholar API returned ${status}. Please try again in a moment.`);
+    } else {
+      const data = await response.json();
+      papers = data.data || [];
     }
 
-    const data = await response.json();
-    const papers: Paper[] = data.data || [];
+    console.log(`Processing ${papers.length} papers in parallel`);
 
-    console.log(`Found ${papers.length} papers`);
+    // Process ALL papers in parallel (single AI call each)
+    const results = await Promise.allSettled(
+      papers.map(async (paper) => {
+        const { summary, keywords, mlCategory } = await enrichPaperWithAI(paper, lovableApiKey!);
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+        const authorNames = paper.authors?.map((a: any) => typeof a === 'string' ? a : a.name || "Unknown") || ["Unknown"];
+        const authorStr = authorNames.join(", ");
 
-    // Process each paper: summarize, extract keywords, generate citations
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    
-    for (const paper of papers) {
-      if (!paper.abstract) continue;
+        const citationApa = `${authorStr} (${paper.year}). ${paper.title}. ${paper.venue || "Conference/Journal"}.`;
+        const citationMla = `${authorStr}. "${paper.title}." ${paper.venue || "Conference/Journal"} (${paper.year}).`;
+        const citationIeee = `${authorStr}, "${paper.title}," ${paper.venue || "Conference/Journal"}, ${paper.year}.`;
 
-      // Generate summary, keywords, and ML classification using Lovable AI
-      let summary = paper.abstract.substring(0, 200) + "...";
-      let keywords: string[] = [];
-      let mlCategory = "Uncategorized";
-
-      try {
-        // Summarization
-        const summaryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${lovableApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "system",
-                content: "You are a research assistant. Provide a concise 2-3 sentence summary of the abstract."
-              },
-              {
-                role: "user",
-                content: `Summarize this abstract:\n\n${paper.abstract}`
-              }
-            ],
-          }),
+        const { error: insertError } = await supabase.from("papers").insert({
+          project_id: projectId,
+          title: paper.title,
+          authors: authorNames,
+          abstract: paper.abstract || "",
+          summary,
+          keywords: [...keywords, `[ML:${mlCategory}]`],
+          citation_apa: citationApa,
+          citation_mla: citationMla,
+          citation_ieee: citationIeee,
+          year: paper.year || new Date().getFullYear(),
+          venue: paper.venue || "Unknown",
+          url: paper.url || "",
+          external_id: paper.paperId || "",
         });
 
-        if (summaryResponse.ok) {
-          const summaryData = await summaryResponse.json();
-          summary = summaryData.choices?.[0]?.message?.content || summary;
+        if (insertError) {
+          console.error("Error inserting paper:", insertError);
         }
+      })
+    );
 
-        // Keyword extraction
-        const keywordResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${lovableApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "system",
-                content: "You are a research assistant. Extract 5-7 key technical terms or keywords from the text. Return only comma-separated keywords, no other text."
-              },
-              {
-                role: "user",
-                content: paper.abstract
-              }
-            ],
-          }),
-        });
-
-        if (keywordResponse.ok) {
-          const keywordData = await keywordResponse.json();
-          const keywordText = keywordData.choices?.[0]?.message?.content || "";
-          keywords = keywordText.split(",").map((k: string) => k.trim()).filter((k: string) => k.length > 0);
-        }
-
-        // ML-based domain classification
-        const classifyResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${lovableApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "system",
-                content: "You are a research paper classifier trained on arXiv data with 96.3% accuracy. Classify the paper into exactly ONE of these domains: Computer Vision, Natural Language Processing, Astrophysics, Combinatorics, Neuroscience, High Energy Physics, Machine Learning, Mathematics, Biology, Chemistry, Economics, Other. Return ONLY the domain name, nothing else."
-              },
-              {
-                role: "user",
-                content: `Title: ${paper.title}\n\nAbstract: ${paper.abstract}`
-              }
-            ],
-          }),
-        });
-
-        if (classifyResponse.ok) {
-          const classifyData = await classifyResponse.json();
-          mlCategory = classifyData.choices?.[0]?.message?.content?.trim() || "Uncategorized";
-        }
-      } catch (error) {
-        console.error("AI processing error:", error);
-      }
-
-      // Generate citations
-      const authorNames = paper.authors.map((a: any) => a.name || "Unknown").join(", ");
-      
-      const citationApa = `${authorNames} (${paper.year}). ${paper.title}. ${paper.venue || "Conference/Journal"}. ${paper.url || ""}`;
-      const citationMla = `${authorNames}. "${paper.title}." ${paper.venue || "Conference/Journal"} (${paper.year}). ${paper.url || ""}`;
-      const citationIeee = `${authorNames}, "${paper.title}," ${paper.venue || "Conference/Journal"}, ${paper.year}. ${paper.url || ""}`;
-
-      // Save to database
-      const { error: insertError } = await supabase.from("papers").insert({
-        project_id: projectId,
-        title: paper.title,
-        authors: paper.authors.map((a: any) => a.name || "Unknown"),
-        abstract: paper.abstract,
-        summary,
-        keywords: [...keywords, `[ML:${mlCategory}]`],
-        citation_apa: citationApa,
-        citation_mla: citationMla,
-        citation_ieee: citationIeee,
-        year: paper.year,
-        venue: paper.venue || "Unknown",
-        url: paper.url || "",
-        external_id: paper.paperId,
-      });
-
-      if (insertError) {
-        console.error("Error inserting paper:", insertError);
-      }
-    }
+    const succeeded = results.filter(r => r.status === "fulfilled").length;
+    console.log(`Processed ${succeeded}/${papers.length} papers successfully`);
 
     return new Response(
-      JSON.stringify({ success: true, papers: papers.length }),
+      JSON.stringify({ success: true, papers: succeeded }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

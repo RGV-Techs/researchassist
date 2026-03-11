@@ -105,12 +105,16 @@ const Project = () => {
     if (!searchTopic.trim()) return;
 
     setSearching(true);
+    toast.info("Discovering papers... This may take a moment.");
     try {
       const { data, error } = await supabase.functions.invoke("discover-papers", {
         body: { topic: searchTopic, projectId: id },
       });
 
       if (error) throw error;
+      
+      const count = data?.papers || 0;
+      toast.success(`Found ${count} papers!`);
       fetchPapers();
     } catch (error: any) {
       toast.error(error.message || "Failed to discover papers");
