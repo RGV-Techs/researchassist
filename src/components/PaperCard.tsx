@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink, BookmarkPlus, ChevronDown, ChevronUp } from "lucide-react";
+import { ExternalLink, BookmarkPlus, ChevronDown, ChevronUp, FileDown } from "lucide-react";
+import { generatePaperReport } from "@/lib/paperReportGenerator";
 
 interface PaperCardProps {
   paper: {
@@ -44,13 +45,23 @@ const PaperCard = ({ paper, index }: PaperCardProps) => {
               {paper.authors.join(", ")} • {paper.year} • {paper.venue}
             </CardDescription>
           </div>
-          {paper.url && (
-            <Button variant="ghost" size="sm" asChild>
-              <a href={paper.url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
-              </a>
+          <div className="flex gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => generatePaperReport(paper)}
+              title="Download paper report"
+            >
+              <FileDown className="h-4 w-4" />
             </Button>
-          )}
+            {paper.url && (
+              <Button variant="ghost" size="sm" asChild>
+                <a href={paper.url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
 
