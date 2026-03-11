@@ -105,12 +105,16 @@ const Project = () => {
     if (!searchTopic.trim()) return;
 
     setSearching(true);
+    toast.info("Discovering papers... This may take a moment.");
     try {
       const { data, error } = await supabase.functions.invoke("discover-papers", {
         body: { topic: searchTopic, projectId: id },
       });
 
       if (error) throw error;
+      
+      const count = data?.papers || 0;
+      toast.success(`Found ${count} papers!`);
       fetchPapers();
     } catch (error: any) {
       toast.error(error.message || "Failed to discover papers");
@@ -138,8 +142,15 @@ const Project = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleDownloadPPT = () => {
-    generateProjectPPT();
+  const handleDownloadPPT = async () => {
+    try {
+      toast.info("Generating presentation...");
+      await generateProjectPPT();
+      toast.success("Presentation downloaded!");
+    } catch (error) {
+      console.error("PPT generation error:", error);
+      toast.error("Failed to generate presentation");
+    }
   };
 
   const handleDownloadReport = () => {
