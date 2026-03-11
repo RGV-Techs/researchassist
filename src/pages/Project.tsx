@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Search, Loader2, BookOpen, Download, FileText, Presentation } from "lucide-react";
+import { ArrowLeft, Search, Loader2, BookOpen, Download, FileText, Presentation, Plus } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import PaperCard from "@/components/PaperCard";
 import { generateProjectPPT } from "@/lib/pptGenerator";
@@ -41,6 +41,9 @@ const Project = () => {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [searchTopic, setSearchTopic] = useState("");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastSearchTopic, setLastSearchTopic] = useState("");
+  const [searchOffset, setSearchOffset] = useState(0);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -108,18 +111,40 @@ const Project = () => {
     toast.info("Discovering papers... This may take a moment.");
     try {
       const { data, error } = await supabase.functions.invoke("discover-papers", {
-        body: { topic: searchTopic, projectId: id },
+        body: { topic: searchTopic, projectId: id, offset: 0 },
       });
 
       if (error) throw error;
       
       const count = data?.papers || 0;
       toast.success(`Found ${count} papers!`);
+      setLastSearchTopic(searchTopic);
+      setSearchOffset(5);
       fetchPapers();
     } catch (error: any) {
       toast.error(error.message || "Failed to discover papers");
     } finally {
       setSearching(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (!lastSearchTopic) return;
+    setLoadingMore(true);
+    toast.info("Fetching more papers...");
+    try {
+      const { data, error } = await supabase.functions.invoke("discover-papers", {
+        body: { topic: lastSearchTopic, projectId: id, offset: searchOffset },
+      });
+      if (error) throw error;
+      const count = data?.papers || 0;
+      toast.success(`Found ${count} more papers!`);
+      setSearchOffset(prev => prev + 5);
+      fetchPapers();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load more papers");
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -253,6 +278,23 @@ const Project = () => {
                 index={index}
               />
             ))}
+            {lastSearchTopic && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="gap-2"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Load More Papers
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </main>

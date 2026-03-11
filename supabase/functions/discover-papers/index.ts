@@ -79,13 +79,13 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, projectId } = await req.json();
+    const { topic, projectId, offset = 0 } = await req.json();
 
     if (!topic || !projectId) {
       throw new Error("Topic and projectId are required");
     }
 
-    console.log("Searching for papers on topic:", topic);
+    console.log("Searching for papers on topic:", topic, "offset:", offset);
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -93,7 +93,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch papers from Semantic Scholar API with retry logic
-    const semanticScholarUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(topic)}&limit=5&fields=title,authors,abstract,year,venue,url,paperId`;
+    const semanticScholarUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(topic)}&limit=5&offset=${offset}&fields=title,authors,abstract,year,venue,url,paperId`;
 
     let response: Response | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
