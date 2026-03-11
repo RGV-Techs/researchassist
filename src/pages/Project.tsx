@@ -128,6 +128,26 @@ const Project = () => {
     }
   };
 
+  const handleLoadMore = async () => {
+    if (!lastSearchTopic) return;
+    setLoadingMore(true);
+    toast.info("Fetching more papers...");
+    try {
+      const { data, error } = await supabase.functions.invoke("discover-papers", {
+        body: { topic: lastSearchTopic, projectId: id, offset: searchOffset },
+      });
+      if (error) throw error;
+      const count = data?.papers || 0;
+      toast.success(`Found ${count} more papers!`);
+      setSearchOffset(prev => prev + 5);
+      fetchPapers();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load more papers");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const exportCitations = (format: "apa" | "mla" | "ieee") => {
     const citations = papers.map(paper => {
       switch (format) {
