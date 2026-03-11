@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Search, Loader2, BookOpen, Download, FileText, Presentation } from "lucide-react";
+import { ArrowLeft, Search, Loader2, BookOpen, Download, FileText, Presentation, Plus } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import PaperCard from "@/components/PaperCard";
 import { generateProjectPPT } from "@/lib/pptGenerator";
