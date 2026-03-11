@@ -278,6 +278,23 @@ const Project = () => {
                 index={index}
               />
             ))}
+            {lastSearchTopic && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="gap-2"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Load More Papers
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </main>
