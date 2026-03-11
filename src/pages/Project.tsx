@@ -41,6 +41,9 @@ const Project = () => {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [searchTopic, setSearchTopic] = useState("");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [lastSearchTopic, setLastSearchTopic] = useState("");
+  const [searchOffset, setSearchOffset] = useState(0);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
