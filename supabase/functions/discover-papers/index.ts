@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 interface Paper {
   title: string;
   authors: string[];
@@ -16,7 +18,6 @@ interface Paper {
   paperId: string;
 }
 
-// Single AI call that returns summary, keywords, and classification together
 async function enrichPaperWithAI(
   paper: Paper,
   lovableApiKey: string
@@ -73,32 +74,92 @@ Return ONLY valid JSON, no markdown.`
   }
 }
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { topic, projectId, offset = 0 } = await req.json();
+    // --- AuthN: validate JWT ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+    const token = authHeader.slice("Bearer ".length);
 
-    if (!topic || !projectId) {
-      throw new Error("Topic and projectId are required");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+    const userId = userData.user.id;
+
+    // --- Input validation ---
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
+
+    const topic = typeof body?.topic === "string" ? body.topic.trim() : "";
+    const projectId = typeof body?.projectId === "string" ? body.projectId : "";
+    const rawOffset = body?.offset;
+
+    if (!topic || topic.length > 200) {
+      return jsonResponse({ error: "Invalid topic (1-200 chars required)" }, 400);
+    }
+    if (!UUID_RE.test(projectId)) {
+      return jsonResponse({ error: "Invalid projectId" }, 400);
+    }
+    let offset = 0;
+    if (rawOffset !== undefined) {
+      const n = Number(rawOffset);
+      if (!Number.isInteger(n) || n < 0 || n > 1000) {
+        return jsonResponse({ error: "Invalid offset" }, 400);
+      }
+      offset = n;
+    }
+
+    // --- AuthZ: verify project ownership ---
+    const admin = createClient(supabaseUrl, serviceKey);
+    const { data: project, error: projErr } = await admin
+      .from("projects")
+      .select("id, user_id")
+      .eq("id", projectId)
+      .maybeSingle();
+
+    if (projErr) {
+      console.error("Project lookup error:", projErr);
+      return jsonResponse({ error: "Server error" }, 500);
+    }
+    if (!project) return jsonResponse({ error: "Project not found" }, 404);
+    if (project.user_id !== userId) {
+      return jsonResponse({ error: "Forbidden" }, 403);
     }
 
     console.log("Searching for papers on topic:", topic, "offset:", offset);
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch papers from Semantic Scholar API with retry logic
     const semanticScholarUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(topic)}&limit=5&offset=${offset}&fields=title,authors,abstract,year,venue,url,paperId`;
 
     let response: Response | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) {
-        console.log(`Retry attempt ${attempt}, waiting ${attempt * 2}s...`);
         await new Promise(r => setTimeout(r, attempt * 2000));
       }
       response = await fetch(semanticScholarUrl);
@@ -109,11 +170,10 @@ serve(async (req) => {
     let papers: Paper[] = [];
 
     if (!response || !response.ok) {
-      const status = response?.status || "unknown";
+      const status = response?.status || 0;
       console.error("Semantic Scholar API error:", status);
 
       if (status === 429) {
-        console.log("Rate limited, using AI fallback");
         const fallbackResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -140,13 +200,13 @@ serve(async (req) => {
             papers = JSON.parse(cleaned);
           } catch (parseErr) {
             console.error("Failed to parse AI fallback:", parseErr);
-            throw new Error("Rate limited and AI fallback failed. Please try again.");
+            return jsonResponse({ error: "Upstream unavailable, please try again." }, 502);
           }
         } else {
-          throw new Error(`Semantic Scholar API returned ${status}. Please try again.`);
+          return jsonResponse({ error: "Upstream unavailable, please try again." }, 502);
         }
       } else {
-        throw new Error(`Semantic Scholar API returned ${status}. Please try again.`);
+        return jsonResponse({ error: "Upstream error, please try again." }, 502);
       }
     } else {
       const data = await response.json();
@@ -155,7 +215,6 @@ serve(async (req) => {
 
     console.log(`Processing ${papers.length} papers in parallel`);
 
-    // Process ALL papers in parallel (single AI call each)
     const results = await Promise.allSettled(
       papers.map(async (paper) => {
         const { summary, keywords, mlCategory } = await enrichPaperWithAI(paper, lovableApiKey!);
@@ -167,7 +226,7 @@ serve(async (req) => {
         const citationMla = `${authorStr}. "${paper.title}." ${paper.venue || "Conference/Journal"} (${paper.year}).`;
         const citationIeee = `${authorStr}, "${paper.title}," ${paper.venue || "Conference/Journal"}, ${paper.year}.`;
 
-        const { error: insertError } = await supabase.from("papers").insert({
+        const { error: insertError } = await admin.from("papers").insert({
           project_id: projectId,
           title: paper.title,
           authors: authorNames,
@@ -192,16 +251,9 @@ serve(async (req) => {
     const succeeded = results.filter(r => r.status === "fulfilled").length;
     console.log(`Processed ${succeeded}/${papers.length} papers successfully`);
 
-    return new Response(
-      JSON.stringify({ success: true, papers: succeeded }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: true, papers: succeeded });
   } catch (error) {
     console.error("Error in discover-papers:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: "Server error" }, 500);
   }
 });
