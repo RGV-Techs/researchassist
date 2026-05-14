@@ -155,18 +155,24 @@ serve(async (req) => {
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
-    // Restrict to papers from 1900 through 2026 (current + recent years), newest first.
+    // Fetch the most recent papers first using the bulk search endpoint
+    // (supports sort=publicationDate:desc). Year range is intentionally wide so
+    // results are not artificially clipped, but ordering guarantees newest-first.
     const currentYear = new Date().getFullYear();
     const maxYear = Math.max(currentYear, 2026);
     const yearRange = `1900-${maxYear}`;
-    const semanticScholarUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(topic)}&limit=5&offset=${offset}&year=${yearRange}&fields=title,authors,abstract,year,venue,url,paperId`;
+    // Bulk endpoint doesn't support offset; emulate pagination by over-fetching
+    // and slicing locally so "Load More" still walks deeper into the result set.
+    const PAGE_SIZE = 5;
+    const fetchCount = offset + PAGE_SIZE;
+    const bulkUrl = `https://api.semanticscholar.org/graph/v1/paper/search/bulk?query=${encodeURIComponent(topic)}&sort=publicationDate:desc&year=${yearRange}&fields=title,authors,abstract,year,venue,url,paperId,publicationDate`;
 
     let response: Response | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) {
         await new Promise(r => setTimeout(r, attempt * 2000));
       }
-      response = await fetch(semanticScholarUrl);
+      response = await fetch(bulkUrl);
       if (response.ok || response.status !== 429) break;
       await response.text();
     }
@@ -189,9 +195,9 @@ serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: "Generate 5 real, well-known research papers related to the given topic. Return a JSON array with objects: title, authors (string array), abstract (2-3 sentences), year (number), venue (string), url (empty string), paperId (empty string). Return ONLY valid JSON."
+                content: "Generate 5 real, recently published research papers (within the last 2 years) related to the given topic. Return a JSON array with objects: title, authors (string array), abstract (2-3 sentences), year (number, must be within the last 2 years), venue (string), url (empty string), paperId (empty string). Return ONLY valid JSON."
               },
-              { role: "user", content: `Generate 5 real research papers about: ${topic}` }
+              { role: "user", content: `Generate 5 most recent research papers about: ${topic}` }
             ],
           }),
         });
@@ -214,9 +220,14 @@ serve(async (req) => {
       }
     } else {
       const data = await response.json();
-      papers = data.data || [];
-      // Sort newest first (2026 → older)
-      papers.sort((a, b) => (b.year || 0) - (a.year || 0));
+      const all = (data.data || []) as any[];
+      // Sort newest-first by publicationDate (fall back to year) and slice the requested page.
+      all.sort((a, b) => {
+        const da = a.publicationDate ? Date.parse(a.publicationDate) : (a.year ? Date.parse(`${a.year}-01-01`) : 0);
+        const db = b.publicationDate ? Date.parse(b.publicationDate) : (b.year ? Date.parse(`${b.year}-01-01`) : 0);
+        return db - da;
+      });
+      papers = all.slice(offset, offset + PAGE_SIZE);
     }
 
     console.log(`Processing ${papers.length} papers in parallel`);
