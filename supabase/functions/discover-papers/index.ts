@@ -215,6 +215,8 @@ serve(async (req) => {
     } else {
       const data = await response.json();
       papers = data.data || [];
+      // Sort newest first (2026 → older)
+      papers.sort((a, b) => (b.year || 0) - (a.year || 0));
     }
 
     console.log(`Processing ${papers.length} papers in parallel`);
