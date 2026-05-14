@@ -155,7 +155,11 @@ serve(async (req) => {
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
-    const semanticScholarUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(topic)}&limit=5&offset=${offset}&fields=title,authors,abstract,year,venue,url,paperId`;
+    // Restrict to papers from 1900 through 2026 (current + recent years), newest first.
+    const currentYear = new Date().getFullYear();
+    const maxYear = Math.max(currentYear, 2026);
+    const yearRange = `1900-${maxYear}`;
+    const semanticScholarUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(topic)}&limit=5&offset=${offset}&year=${yearRange}&fields=title,authors,abstract,year,venue,url,paperId`;
 
     let response: Response | null = null;
     for (let attempt = 0; attempt < 3; attempt++) {
